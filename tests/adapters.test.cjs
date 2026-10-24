@@ -54,6 +54,10 @@ test('browse waits for search completion and reports the actual site query', () 
     'https://viu.to/movies.php?q=');
   assert.equal(loading.ready, false);
   assert.equal(loading.query, '');
+  const bootstrap = read('Browse', markup + '<div id="spinner" style="display:none"></div>',
+    'https://viu.to/tv.php?page=1&search=Law%20%26%20Order');
+  // A requested bootstrap query does not prove the old cards were replaced.
+  assert.equal(bootstrap.query, '');
   const complete = read('Browse', markup + '<div id="spinner" style="display:none"></div>',
     'https://viu.to/tv.php?q=Law%20%26%20Order');
   assert.equal(complete.ready, true);
