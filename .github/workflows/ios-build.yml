@@ -1,13 +1,19 @@
 name: Build VIU for sideloading
+
 on:
   workflow_dispatch:
+
 permissions:
   contents: read
+
 concurrency:
   group: viu-ios-build
   cancel-in-progress: true
+
 jobs:
   build:
+    # Standard runners are free for public repositories. Do not consume a
+    # private account's allowance or incur overage under the zero-cost brief.
     if: github.event.repository.private == false
     runs-on: macos-15
     timeout-minutes: 20
@@ -23,6 +29,9 @@ jobs:
         working-directory: ios
         run: |
           brew install xcodegen
+          cd ..
+          swift ios/generate-icon.swift
+          cd ios
           xcodegen generate
       - name: Compile for physical iPhone
         run: |
@@ -42,4 +51,35 @@ jobs:
           name: VIU-unsigned-ipa
           path: VIU-unsigned.ipa
           if-no-files-found: error
+          retention-days: 1
+      - name: Select iPhone simulator
+        run: |
+          xcrun simctl list devices available --json > devices.json
+          python3 - <<'PY'
+          import json, os
+          devices = [d for runtime, rows in json.load(open('devices.json'))['devices'].items()
+                     if 'iOS' in runtime for d in rows if 'iPhone' in d['name']]
+          devices.sort(key=lambda d: ('16 Pro Max' in d['name'], 'Pro Max' in d['name']), reverse=True)
+          assert devices, 'No available iPhone simulator'
+          with open(os.environ['GITHUB_ENV'], 'a') as env:
+              env.write('VIU_SIMULATOR=' + devices[0]['udid'] + '\n')
+          print('Selected simulator:', devices[0]['name'])
+          PY
+      - name: Run native UI checks
+        run: |
+          xcodebuild test -project ios/VIU.xcodeproj -scheme VIU \
+            -destination "platform=iOS Simulator,id=$VIU_SIMULATOR" \
+            -parallel-testing-enabled NO -resultBundlePath UIResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO
+      - name: Export simulator screenshots
+        if: always()
+        run: |
+          if [ -d UIResults.xcresult ]; then
+            xcrun xcresulttool export attachments --path UIResults.xcresult --output-path simulator-screenshots
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: VIU-simulator-checks
+          path: simulator-screenshots/
           retention-days: 1
