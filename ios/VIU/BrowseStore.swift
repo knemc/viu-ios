@@ -103,10 +103,16 @@ final class BrowseStore: NSObject, ObservableObject, WKNavigationDelegate {
             URLQueryItem(name: "sortby", value: "New Arrivals"),
             URLQueryItem(name: "quality", value: "All"),
             URLQueryItem(name: "type", value: kind.type),
-            URLQueryItem(name: "q", value: ""),
-            URLQueryItem(name: "token", value: ""),
-            URLQueryItem(name: "ptype", value: "is")
+            URLQueryItem(name: "token", value: "")
         ]
+        // VIU's bootstrap reads `search`, whereas `q` + `ptype=is` is
+        // only its history URL after AJAX completes. Reopening that URL
+        // discards the search. Use the bootstrap route for native searches.
+        if query.isEmpty {
+            components.queryItems?.append(contentsOf: [URLQueryItem(name: "q", value: ""), URLQueryItem(name: "ptype", value: "is")])
+        } else {
+            components.queryItems?.append(URLQueryItem(name: "search", value: query))
+        }
         webView.load(URLRequest(url: components.url!, cachePolicy: .reloadIgnoringLocalCacheData))
     }
 
@@ -134,7 +140,6 @@ final class BrowseStore: NSObject, ObservableObject, WKNavigationDelegate {
             self.fail("The browse reader is missing from this build."); return
         }
         var lastSignature: String?
-        var submitted = append || query.isEmpty
         for _ in 0..<40 {
             guard !Task.isCancelled, self.generation == requestID else { return }
             do {
@@ -145,26 +150,6 @@ final class BrowseStore: NSObject, ObservableObject, WKNavigationDelegate {
                     let existing = Set(self.items.map(\.id))
                     let added = snapshot.items.filter { !existing.contains($0.id) }
                     let signature = snapshot.items.map(\.id).joined(separator: "|")
-                    if !submitted {
-                        // VIU ignores q at startup. Submit its real search control
-                        // after the initial catalogue has settled instead.
-                        if signature == lastSignature {
-                            _ = try await self.webView.callAsyncJavaScript("""
-                            const field = document.querySelector('input.search-input');
-                            if (!field) throw new Error('Search field missing');
-                            field.value = query;
-                            field.dispatchEvent(new Event('input', {bubbles:true}));
-                            field.dispatchEvent(new KeyboardEvent('keyup', {
-                                key:'Enter', code:'Enter', keyCode:13, which:13, bubbles:true
-                            }));
-                            return true;
-                            """, arguments: ["query": self.query], in: nil, contentWorld: .page)
-                            submitted = true
-                            lastSignature = nil
-                        } else { lastSignature = signature }
-                        try await Task.sleep(for: .milliseconds(400))
-                        continue
-                    }
                     guard snapshot.query == self.query else {
                         lastSignature = nil
                         try await Task.sleep(for: .milliseconds(400))
