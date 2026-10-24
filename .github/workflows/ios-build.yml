@@ -1,0 +1,45 @@
+name: Build VIU for sideloading
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: viu-ios-build
+  cancel-in-progress: true
+jobs:
+  build:
+    if: github.event.repository.private == false
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check website adapters
+        run: |
+          npm ci --ignore-scripts
+          npm test
+      - name: Generate Xcode project
+        working-directory: ios
+        run: |
+          brew install xcodegen
+          xcodegen generate
+      - name: Compile for physical iPhone
+        run: |
+          xcodebuild -project ios/VIU.xcodeproj -scheme VIU \
+            -configuration Release -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p package/Payload
+          cp -R build/Build/Products/Release-iphoneos/VIU.app package/Payload/
+          cd package
+          zip -qr ../VIU-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VIU-unsigned-ipa
+          path: VIU-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 1
