@@ -66,19 +66,30 @@ jobs:
           print('Selected simulator:', devices[0]['name'])
           PY
       - name: Run native UI checks
+        timeout-minutes: 8
         run: |
           xcrun simctl boot "$VIU_SIMULATOR" || true
           xcrun simctl bootstatus "$VIU_SIMULATOR" -b
           xcodebuild test -project ios/VIU.xcodeproj -scheme VIU \
             -destination "platform=iOS Simulator,id=$VIU_SIMULATOR" \
             -parallel-testing-enabled NO -resultBundlePath UIResults.xcresult \
+            -test-timeouts-enabled YES -default-test-execution-time-allowance 60 \
+            -maximum-test-execution-time-allowance 90 \
             CODE_SIGNING_ALLOWED=NO
       - name: Export simulator screenshots
         if: always()
         run: |
+          mkdir -p simulator-diagnostics
+          xcrun simctl io "$VIU_SIMULATOR" screenshot simulator-diagnostics/simulator.png || true
+          xcrun simctl spawn "$VIU_SIMULATOR" log show --last 15m --style compact \
+            --predicate 'process == "VIU" OR eventMessage CONTAINS "personal.viu.client"' \
+            > simulator-diagnostics/viu-process.log 2>&1 || true
+          find "$HOME/Library/Logs/DiagnosticReports" \
+            "$HOME/Library/Developer/CoreSimulator/Devices/$VIU_SIMULATOR/data/Library/Logs" \
+            -type f -name '*VIU*' -exec cp {} simulator-diagnostics/ \; 2>/dev/null || true
           if [ -d UIResults.xcresult ]; then
-            xcrun xcresulttool export attachments --path UIResults.xcresult --output-path simulator-screenshots
-            xcrun xcresulttool export diagnostics --path UIResults.xcresult --output-path simulator-diagnostics
+            xcrun xcresulttool export attachments --path UIResults.xcresult --output-path simulator-screenshots || true
+            xcrun xcresulttool export diagnostics --path UIResults.xcresult --output-path simulator-diagnostics/xcresult || true
           fi
       - uses: actions/upload-artifact@v4
         if: always()
