@@ -204,7 +204,9 @@ private struct SystemVideoPlayer: UIViewControllerRepresentable {
 
         func playerViewController(_ playerViewController: AVPlayerViewController,
                                   restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void) {
-            completionHandler(playerViewController.viewIfLoaded?.window != nil)
+            // Automatic dismissal is disabled above: the full-screen cover
+            // stays presented while PiP runs, ready for AVKit to restore.
+            completionHandler(true)
         }
     }
 }
