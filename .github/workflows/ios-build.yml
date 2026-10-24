@@ -67,6 +67,8 @@ jobs:
           PY
       - name: Run native UI checks
         run: |
+          xcrun simctl boot "$VIU_SIMULATOR" || true
+          xcrun simctl bootstatus "$VIU_SIMULATOR" -b
           xcodebuild test -project ios/VIU.xcodeproj -scheme VIU \
             -destination "platform=iOS Simulator,id=$VIU_SIMULATOR" \
             -parallel-testing-enabled NO -resultBundlePath UIResults.xcresult \
@@ -76,10 +78,13 @@ jobs:
         run: |
           if [ -d UIResults.xcresult ]; then
             xcrun xcresulttool export attachments --path UIResults.xcresult --output-path simulator-screenshots
+            xcrun xcresulttool export diagnostics --path UIResults.xcresult --output-path simulator-diagnostics
           fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: VIU-simulator-checks
-          path: simulator-screenshots/
+          path: |
+            simulator-screenshots/
+            simulator-diagnostics/
           retention-days: 1
