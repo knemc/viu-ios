@@ -1,43 +1,41 @@
-import AppKit
+import CoreGraphics
 import Foundation
+import ImageIO
+import UniformTypeIdentifiers
 
-// Code-drawn artwork keeps the app icon reproducible without design services.
-let size = NSSize(width: 1024, height: 1024)
-let image = NSImage(size: size)
-image.lockFocus()
-let bounds = NSRect(origin: .zero, size: size)
-let gradient = NSGradient(starting: NSColor(srgbRed: 0.26, green: 0.20, blue: 0.59, alpha: 1),
-                          ending: NSColor(srgbRed: 0.045, green: 0.065, blue: 0.13, alpha: 1))!
-gradient.draw(in: bounds, angle: -70)
-let mark = NSBezierPath()
-let points: [NSPoint] = [.init(x: 220, y: 740), .init(x: 385, y: 740), .init(x: 512, y: 408),
-                        .init(x: 639, y: 740), .init(x: 804, y: 740), .init(x: 594, y: 240), .init(x: 430, y: 240)]
-mark.move(to: points[0])
-for point in points.dropFirst() { mark.line(to: point) }
-mark.close()
-NSColor.white.setFill()
-mark.fill()
-let play = NSBezierPath()
-play.move(to: .init(x: 700, y: 245))
-play.line(to: .init(x: 700, y: 405))
-play.line(to: .init(x: 835, y: 325))
-play.close()
-NSColor(srgbRed: 0.38, green: 0.91, blue: 0.79, alpha: 1).setFill()
-play.fill()
-image.unlockFocus()
-
+// Render directly into an opaque bitmap; no window server is required.
+let size = 1024
+let space = CGColorSpaceCreateDeviceRGB()
+let context = CGContext(data: nil, width: size, height: size, bitsPerComponent: 8,
+                        bytesPerRow: size * 4, space: space,
+                        bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+let colors = [CGColor(red: 0.26, green: 0.20, blue: 0.59, alpha: 1),
+              CGColor(red: 0.045, green: 0.065, blue: 0.13, alpha: 1)] as CFArray
+let gradient = CGGradient(colorsSpace: space, colors: colors, locations: [0, 1])!
+context.drawLinearGradient(gradient, start: CGPoint(x: 0, y: 1024), end: CGPoint(x: 900, y: 0),
+                           options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+let points: [CGPoint] = [.init(x: 220, y: 740), .init(x: 385, y: 740), .init(x: 512, y: 408),
+                         .init(x: 639, y: 740), .init(x: 804, y: 740), .init(x: 594, y: 240), .init(x: 430, y: 240)]
+context.addLines(between: points)
+context.closePath()
+context.setFillColor(CGColor(gray: 1, alpha: 1))
+context.fillPath()
+context.addLines(between: [.init(x: 700, y: 245), .init(x: 700, y: 405), .init(x: 835, y: 325)])
+context.closePath()
+context.setFillColor(CGColor(red: 0.38, green: 0.91, blue: 0.79, alpha: 1))
+context.fillPath()
+let pixels = context.data!.assumingMemoryBound(to: UInt8.self)
+let whitePixels = stride(from: 0, to: size * size * 4, by: 4).filter {
+    pixels[$0] > 240 && pixels[$0 + 1] > 240 && pixels[$0 + 2] > 240
+}.count
+precondition(whitePixels > 50_000, "App icon rendering failed: missing white monogram")
 let root = URL(fileURLWithPath: "ios/VIU/Assets.xcassets", isDirectory: true)
 let icon = root.appendingPathComponent("AppIcon.appiconset", isDirectory: true)
 try FileManager.default.createDirectory(at: icon, withIntermediateDirectories: true)
-let bitmap = NSBitmapImageRep(data: image.tiffRepresentation!)!
-let rgb = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 1024, pixelsHigh: 1024,
-                          bitsPerSample: 8, samplesPerPixel: 3, hasAlpha: false,
-                          isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
-NSGraphicsContext.saveGraphicsState()
-NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rgb)
-bitmap.draw(in: bounds)
-NSGraphicsContext.restoreGraphicsState()
-try rgb.representation(using: .png, properties: [:])!.write(to: icon.appendingPathComponent("AppIcon.png"))
+let destination = CGImageDestinationCreateWithURL(icon.appendingPathComponent("AppIcon.png") as CFURL,
+                                                 UTType.png.identifier as CFString, 1, nil)!
+CGImageDestinationAddImage(destination, context.makeImage()!, nil)
+precondition(CGImageDestinationFinalize(destination), "Couldn't write app icon")
 let contents = """
 {"images":[{"filename":"AppIcon.png","idiom":"universal","platform":"ios","size":"1024x1024"}],"info":{"author":"xcode","version":1}}
 """
