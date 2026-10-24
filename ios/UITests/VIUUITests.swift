@@ -28,13 +28,31 @@ final class VIUUITests: XCTestCase {
     @MainActor
     func testLargeTextAccountLayout() {
         let app = XCUIApplication()
-        app.launchArguments = ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        app.launchArguments = ["-AppleInterfaceStyle", "Dark", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         app.launch()
         let account = app.tabBars.buttons["Account"]
         XCTAssertTrue(account.waitForExistence(timeout: 15))
         account.tap()
         XCTAssertTrue(app.navigationBars["Account"].waitForExistence(timeout: 5))
         capture(app, "Account large text")
+    }
+
+    @MainActor
+    func testLocalSignOutRestoresNavigation() {
+        let app = XCUIApplication()
+        app.launch()
+        let account = app.tabBars.buttons["Account"]
+        XCTAssertTrue(account.waitForExistence(timeout: 15))
+        account.tap()
+        let signOut = app.buttons["Sign out on this iPhone"]
+        XCTAssertTrue(signOut.waitForExistence(timeout: 5))
+        signOut.tap()
+        let confirm = app.buttons["Sign out"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 3))
+        confirm.tap()
+        XCTAssertTrue(app.tabBars.buttons["Account"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Account"].tap()
+        XCTAssertTrue(app.navigationBars["Account"].waitForExistence(timeout: 5))
     }
 
     @MainActor
