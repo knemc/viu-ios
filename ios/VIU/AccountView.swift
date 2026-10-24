@@ -70,7 +70,7 @@ struct AccountView: View {
                     Text("Movie and episode playback resumes from the position saved on this iPhone. Progress is not synced with VIU's website.")
                 }
                 Section("About") {
-                    LabeledContent("Version", value: "0.1.0")
+                    LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown")
                     Text("An independent personal client for your existing VIU account.")
                         .foregroundStyle(.secondary)
                 }
