@@ -35,3 +35,26 @@ targets:
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
         MARKETING_VERSION: '0.1.0'
         CURRENT_PROJECT_VERSION: '1'
+        TARGETED_DEVICE_FAMILY: '1'
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+  VIUUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - UITests
+    dependencies:
+      - target: VIU
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: VIU
+        TARGETED_DEVICE_FAMILY: '1'
+schemes:
+  VIU:
+    build:
+      targets:
+        VIU: all
+        VIUUITests: [test]
+    test:
+      targets:
+        - VIUUITests
