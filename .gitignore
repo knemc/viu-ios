@@ -8,3 +8,7 @@ node_modules/
 build/
 package/
 *.ipa
+deliverables/
+ios/VIU/Assets.xcassets/
+UIResults.xcresult/
+simulator-screenshots/
