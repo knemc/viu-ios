@@ -47,6 +47,19 @@ test('browse reader distinguishes loading, loaded-empty and missing markup', () 
   assert.equal(read('Browse', '<main>Unexpected page</main>').ready, false);
 });
 
+test('browse waits for search completion and reports the actual site query', () => {
+  const markup = `<section id="content">${card('/wm/1/Old', 'Old title')}</section>
+    <div id="spinner_load" style="display:none"></div>`;
+  const loading = read('Browse', markup + '<div id="spinner" style="display:block"></div>',
+    'https://viu.to/movies.php?q=');
+  assert.equal(loading.ready, false);
+  assert.equal(loading.query, '');
+  const complete = read('Browse', markup + '<div id="spinner" style="display:none"></div>',
+    'https://viu.to/tv.php?q=Law%20%26%20Order');
+  assert.equal(complete.ready, true);
+  assert.equal(complete.query, 'Law & Order');
+});
+
 test('details reader preserves episode identity separately from stale player identity', () => {
   const value = read('TitleDetails', `<div class="movie-info"><h1>Series</h1>
     <p class="movie-description">Synopsis</p><span class="movie-date">2024</span>
