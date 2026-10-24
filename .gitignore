@@ -1,0 +1,10 @@
+ios/VIU.xcodeproj/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.DS_Store
+.validation-deps/
+node_modules/
+build/
+package/
+*.ipa
