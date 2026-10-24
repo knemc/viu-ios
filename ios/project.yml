@@ -1,0 +1,37 @@
+name: VIU
+options:
+  bundleIdPrefix: personal
+  deploymentTarget:
+    iOS: '18.0'
+settings:
+  base:
+    SWIFT_VERSION: '6.0'
+    TARGETED_DEVICE_FAMILY: '1'
+targets:
+  VIU:
+    type: application
+    platform: iOS
+    sources:
+      - path: VIU
+        excludes:
+          - Catalogue.js
+          - TitleDetails.js
+          - Browse.js
+          - LiveTV.js
+      - path: VIU/Catalogue.js
+        buildPhase: resources
+      - path: VIU/TitleDetails.js
+        buildPhase: resources
+      - path: VIU/Browse.js
+        buildPhase: resources
+      - path: VIU/LiveTV.js
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: personal.viu.client
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: VIU
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        MARKETING_VERSION: '0.1.0'
+        CURRENT_PROJECT_VERSION: '1'
