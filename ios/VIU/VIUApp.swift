@@ -6,12 +6,18 @@ struct VIUApp: App {
     @StateObject private var session = AppSession()
     var body: some Scene {
         WindowGroup {
-            TabView {
-                CatalogueView().tabItem { Label("Home", systemImage: "house") }
-                BrowseView(kind: .movies).tabItem { Label("Movies", systemImage: "film") }
-                BrowseView(kind: .series).tabItem { Label("TV", systemImage: "tv") }
-                LiveTVView().tabItem { Label("Live", systemImage: "dot.radiowaves.left.and.right") }
-                AccountView().tabItem { Label("Account", systemImage: "person.crop.circle") }
+            Group {
+                if session.isSigningOut {
+                    ProgressView("Signing out…")
+                } else {
+                    TabView {
+                        CatalogueView().tabItem { Label("Home", systemImage: "house") }
+                        BrowseView(kind: .movies).tabItem { Label("Movies", systemImage: "film") }
+                        BrowseView(kind: .series).tabItem { Label("TV", systemImage: "tv") }
+                        LiveTVView().tabItem { Label("Live", systemImage: "dot.radiowaves.left.and.right") }
+                        AccountView().tabItem { Label("Account", systemImage: "person.crop.circle") }
+                    }
+                }
             }
             .id(session.generation)
             .environmentObject(session)
@@ -55,6 +61,7 @@ private struct CatalogueView: View {
                 VIUSignInView(url: URL(string: "https://viu.to/")!, title: "VIU website")
             }
             .task { if store.sections.isEmpty { store.load() } }
+            .onDisappear { store.cancel() }
         }
         .tint(.indigo)
     }

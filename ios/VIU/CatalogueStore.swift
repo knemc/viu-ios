@@ -27,6 +27,7 @@ final class CatalogueStore: NSObject, ObservableObject, WKNavigationDelegate {
     @Published private(set) var needsSignIn = false
     @Published private(set) var error: String?
     let webView: WKWebView
+    private var generation = UUID()
 
     override init() {
         let configuration = WKWebViewConfiguration()
@@ -38,9 +39,16 @@ final class CatalogueStore: NSObject, ObservableObject, WKNavigationDelegate {
     }
 
     func load() {
+        cancel()
         isLoading = true
         error = nil
         webView.load(URLRequest(url: URL(string: "https://viu.to/")!))
+    }
+
+    func cancel() {
+        generation = UUID()
+        webView.stopLoading()
+        isLoading = false
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -60,8 +68,9 @@ final class CatalogueStore: NSObject, ObservableObject, WKNavigationDelegate {
             fail("The catalogue reader is missing from this build.")
             return
         }
+        let requestID = generation
         webView.evaluateJavaScript(script) { [weak self] result, scriptError in
-            guard let self else { return }
+            guard let self, self.generation == requestID else { return }
             self.isLoading = false
             guard scriptError == nil, let json = result as? String,
                   let data = json.data(using: .utf8),
