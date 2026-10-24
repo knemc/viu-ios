@@ -22,9 +22,9 @@ struct BrowseView: View {
             }
             .navigationTitle(store.needsSignIn ? "Sign in to VIU" : kind.title)
             .searchable(text: $query, prompt: "Search VIU")
-            .onSubmit(of: .search) { store.search(kind: kind, query: query) }
-            .onChange(of: query) { old, new in
-                if new.isEmpty && !old.isEmpty { store.search(kind: kind, query: "") }
+            .task(id: query) {
+                do { try await Task.sleep(for: .milliseconds(400)) } catch { return }
+                store.search(kind: kind, query: query)
             }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -38,7 +38,6 @@ struct BrowseView: View {
             .sheet(isPresented: $showsWebsite) {
                 VIUSignInView(url: URL(string: "https://viu.to\(kind.path)")!, title: kind.title)
             }
-            .task { if !store.hasLoaded { store.search(kind: kind, query: query) } }
             .onDisappear { store.cancel() }
         }
     }
@@ -69,7 +68,7 @@ struct BrowseView: View {
     }
 }
 
-private struct BrowseSessionView: UIViewRepresentable {
+struct BrowseSessionView: UIViewRepresentable {
     let webView: WKWebView
     func makeUIView(context: Context) -> WKWebView { webView }
     func updateUIView(_ uiView: WKWebView, context: Context) {}

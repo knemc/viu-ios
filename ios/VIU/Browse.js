@@ -15,5 +15,8 @@
             year:card.querySelector('.mf-year')?.textContent.trim() || '',
             rating:card.querySelector('.imdb-rating-icon span')?.textContent.trim() || ''}];
     });
-    return JSON.stringify({items, ready:!!content && !!spinner && getComputedStyle(spinner).display === 'none'});
+    const searchSpinner = document.querySelector('#spinner');
+    const hidden = element => !element || getComputedStyle(element).display === 'none';
+    return JSON.stringify({items, query:new URL(location.href).searchParams.get('q') || '',
+        ready:!!content && !!spinner && hidden(spinner) && hidden(searchSpinner)});
 })();

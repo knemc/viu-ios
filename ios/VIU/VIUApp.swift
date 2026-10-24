@@ -40,10 +40,14 @@ private struct CatalogueView: View {
                     .allowsHitTesting(store.needsSignIn)
                     .accessibilityHidden(!store.needsSignIn)
                 if !store.needsSignIn {
-                    catalogue.background(Color(uiColor: .systemBackground))
+                    Group {
+                        if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { catalogue }
+                        else { CatalogueSearchResults(query: query, selection: $selection) }
+                    }.background(Color(uiColor: .systemBackground))
                 }
             }
             .navigationTitle(store.needsSignIn ? "Sign in to VIU" : "VIU")
+            .searchable(text: $query, prompt: "Search all movies and TV")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -87,21 +91,13 @@ private struct CatalogueView: View {
                     if let error = store.error {
                         Text(error).font(.callout).foregroundStyle(.secondary).padding(.horizontal)
                     }
-                    if !query.isEmpty {
-                        Text("Search in loaded titles")
-                            .font(.caption).foregroundStyle(.secondary).padding(.horizontal)
-                    }
-                    let visible = store.sections.filter { section in
-                        section.items.contains { matches($0) }
-                    }
-                    if visible.isEmpty { ContentUnavailableView.search(text: query) }
-                    ForEach(visible) { section in
+                    ForEach(store.sections) { section in
                         VStack(alignment: .leading, spacing: 12) {
                             Text(section.id).font(.title2.bold()).padding(.horizontal)
                                 .accessibilityAddTraits(.isHeader)
                             ScrollView(.horizontal) {
                                 LazyHStack(alignment: .top, spacing: 14) {
-                                    ForEach(section.items.filter { matches($0) }) { item in
+                                    ForEach(section.items) { item in
                                         Button { selection = item } label: { PosterCard(item: item) }
                                             .buttonStyle(.plain)
                                     }
@@ -111,15 +107,57 @@ private struct CatalogueView: View {
                     }
                 }.padding(.vertical)
             }
-            .searchable(text: $query, prompt: "Find in loaded titles")
             .overlay(alignment: .topTrailing) {
                 if store.isLoading { ProgressView().padding() }
             }
         }
     }
 
-    private func matches(_ item: CatalogueItem) -> Bool {
-        query.isEmpty || item.title.localizedStandardContains(query)
+}
+
+private struct CatalogueSearchResults: View {
+    let query: String
+    @Binding var selection: CatalogueItem?
+    @StateObject private var movies = BrowseStore()
+
+    var body: some View {
+        ZStack {
+            BrowseSessionView(webView: movies.webView).opacity(0).allowsHitTesting(false).accessibilityHidden(true)
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 24) {
+                    results(movies, kind: .movies)
+                }.padding(.vertical)
+            }.background(Color(uiColor: .systemBackground))
+        }
+        .task(id: query) {
+            movies.cancel()
+            do { try await Task.sleep(for: .milliseconds(400)) } catch { return }
+            movies.search(kind: .movies, query: query)
+        }
+        .onDisappear { movies.cancel() }
+    }
+
+    private func results(_ store: BrowseStore, kind: CatalogueKind) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Search results").font(.title2.bold()).accessibilityAddTraits(.isHeader)
+            if store.isLoading { ProgressView("Searching VIU…") }
+            if store.needsSignIn {
+                Text("Sign in to VIU from the \(kind.title) tab to search.")
+            } else if let error = store.error {
+                Text(error).foregroundStyle(.secondary)
+                Button("Retry search") { store.retry() }
+            } else if store.hasLoaded && store.items.isEmpty {
+                Text("No matching titles").foregroundStyle(.secondary)
+            }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 148), alignment: .top)], alignment: .leading, spacing: 24) {
+                ForEach(store.items) { item in
+                    Button { selection = item } label: { PosterCard(item: item) }.buttonStyle(.plain)
+                }
+            }
+            if store.canLoadMore && !store.isLoading {
+                Button("Load more results") { store.loadMore() }.buttonStyle(.bordered)
+            }
+        }.padding(.horizontal)
     }
 }
 

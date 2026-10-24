@@ -143,7 +143,7 @@ struct NativePlayerView: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             Color.black.ignoresSafeArea()
-            VideoPlayer(player: session.player).ignoresSafeArea()
+            SystemVideoPlayer(player: session.player).ignoresSafeArea()
             Button { dismiss() } label: {
                 Image(systemName: "xmark.circle.fill").font(.largeTitle)
                     .symbolRenderingMode(.palette).foregroundStyle(.white, .black.opacity(0.6))
@@ -176,6 +176,36 @@ struct NativePlayerView: View {
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         }
         .accessibilityLabel(title)
+    }
+}
+
+// Keep the presenting player alive during PiP so restoring the video returns
+// to the same playback position without creating a second AVPlayer.
+private struct SystemVideoPlayer: UIViewControllerRepresentable {
+    let player: AVPlayer
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeUIViewController(context: Context) -> AVPlayerViewController {
+        let controller = AVPlayerViewController()
+        controller.player = player
+        controller.delegate = context.coordinator
+        controller.allowsPictureInPicturePlayback = true
+        controller.canStartPictureInPictureAutomaticallyFromInline = true
+        return controller
+    }
+
+    func updateUIViewController(_ controller: AVPlayerViewController, context: Context) {}
+
+    final class Coordinator: NSObject, AVPlayerViewControllerDelegate {
+        func playerViewControllerShouldAutomaticallyDismissAtPictureInPictureStart(_ playerViewController: AVPlayerViewController) -> Bool {
+            false
+        }
+
+        func playerViewController(_ playerViewController: AVPlayerViewController,
+                                  restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void) {
+            completionHandler(playerViewController.viewIfLoaded?.window != nil)
+        }
     }
 }
 
