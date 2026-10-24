@@ -31,7 +31,7 @@ final class CatalogueStore: NSObject, ObservableObject, WKNavigationDelegate {
 
     override init() {
         let configuration = WKWebViewConfiguration()
-        configuration.websiteDataStore = .default()
+        configuration.websiteDataStore = AppSession.websiteDataStore
         configuration.mediaTypesRequiringUserActionForPlayback = .all
         webView = WKWebView(frame: .zero, configuration: configuration)
         super.init()

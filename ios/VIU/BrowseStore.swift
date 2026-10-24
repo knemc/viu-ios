@@ -33,7 +33,7 @@ final class BrowseStore: NSObject, ObservableObject, WKNavigationDelegate {
 
     override init() {
         let config = WKWebViewConfiguration()
-        config.websiteDataStore = .default()
+        config.websiteDataStore = AppSession.websiteDataStore
         config.mediaTypesRequiringUserActionForPlayback = .all
         webView = WKWebView(frame: .zero, configuration: config)
         super.init()
@@ -50,10 +50,35 @@ final class BrowseStore: NSObject, ObservableObject, WKNavigationDelegate {
         request(page: 1)
     }
 
-    func retry() { request(page: pendingPage) }
+    func retry() {
+        if pendingPage > 1, !items.isEmpty { loadMore() }
+        else { request(page: 1) }
+    }
     func loadMore() {
         guard !isLoading, canLoadMore else { return }
-        request(page: page + 1)
+        readTask?.cancel()
+        generation = UUID()
+        let requestID = generation
+        pendingPage = page + 1
+        isLoading = true
+        error = nil
+        readTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                // VIU initialises URL page parameters back to one. Its actual
+                // pagination is driven by the existing page's scroll handler.
+                _ = try await self.webView.evaluateJavaScript("""
+                window.scrollTo(0, 0);
+                requestAnimationFrame(() => window.scrollTo(0, document.documentElement.scrollHeight));
+                true;
+                """)
+                guard !Task.isCancelled, self.generation == requestID else { return }
+                await self.readCatalogue(requestID: requestID, append: true)
+            } catch {
+                guard !Task.isCancelled, self.generation == requestID else { return }
+                self.fail("Couldn't load more titles. Please retry.")
+            }
+        }
     }
 
     func cancel() {
@@ -98,38 +123,42 @@ final class BrowseStore: NSObject, ObservableObject, WKNavigationDelegate {
         let requestID = generation
         readTask = Task { [weak self] in
             guard let self else { return }
-            guard let resource = Bundle.main.url(forResource: "Browse", withExtension: "js"),
-                  let script = try? String(contentsOf: resource, encoding: .utf8) else {
-                self.fail("The browse reader is missing from this build."); return
-            }
-            var lastSignature: String?
-            for _ in 0..<40 {
-                guard !Task.isCancelled, self.generation == requestID else { return }
-                do {
-                    let result = try await self.webView.evaluateJavaScript(script)
-                    guard !Task.isCancelled, self.generation == requestID else { return }
-                    if let json = result as? String, let data = json.data(using: .utf8),
-                       let snapshot = try? JSONDecoder().decode(BrowseSnapshot.self, from: data), snapshot.ready {
-                        let signature = snapshot.items.map(\.id).joined(separator: "|")
-                        if signature == lastSignature {
-                            let existing = Set(self.items.map(\.id))
-                            let added = snapshot.items.filter { !existing.contains($0.id) }
-                            if self.pendingPage == 1 { self.items = snapshot.items }
-                            else { self.items.append(contentsOf: added) }
-                            self.page = self.pendingPage
-                            self.canLoadMore = !added.isEmpty
-                            self.hasLoaded = true
-                            self.isLoading = false
-                            self.error = nil
-                            return
-                        }
-                        lastSignature = signature
-                    } else { lastSignature = nil }
-                } catch { lastSignature = nil }
-                do { try await Task.sleep(for: .milliseconds(400)) } catch { return }
-            }
-            self.fail("VIU's catalogue didn't finish loading. Please retry.")
+            await self.readCatalogue(requestID: requestID, append: false)
         }
+    }
+
+    private func readCatalogue(requestID: UUID, append: Bool) async {
+        guard let resource = Bundle.main.url(forResource: "Browse", withExtension: "js"),
+              let script = try? String(contentsOf: resource, encoding: .utf8) else {
+            self.fail("The browse reader is missing from this build."); return
+        }
+        var lastSignature: String?
+        for _ in 0..<40 {
+            guard !Task.isCancelled, self.generation == requestID else { return }
+            do {
+                let result = try await self.webView.evaluateJavaScript(script)
+                guard !Task.isCancelled, self.generation == requestID else { return }
+                if let json = result as? String, let data = json.data(using: .utf8),
+                   let snapshot = try? JSONDecoder().decode(BrowseSnapshot.self, from: data), snapshot.ready {
+                    let existing = Set(self.items.map(\.id))
+                    let added = snapshot.items.filter { !existing.contains($0.id) }
+                    let signature = snapshot.items.map(\.id).joined(separator: "|")
+                    if signature == lastSignature, !append || !added.isEmpty {
+                        if !append { self.items = snapshot.items }
+                        else { self.items.append(contentsOf: added) }
+                        self.page = self.pendingPage
+                        self.canLoadMore = !added.isEmpty
+                        self.hasLoaded = true
+                        self.isLoading = false
+                        self.error = nil
+                        return
+                    }
+                    lastSignature = signature
+                } else { lastSignature = nil }
+            } catch { lastSignature = nil }
+            do { try await Task.sleep(for: .milliseconds(400)) } catch { return }
+        }
+        self.fail(append ? "No additional titles were returned. You may have reached the end; retry or open VIU." : "VIU's catalogue didn't finish loading. Please retry.")
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { handle(error) }

@@ -27,7 +27,7 @@ final class LiveTVStore: NSObject, ObservableObject, WKNavigationDelegate {
 
     override init() {
         let config = WKWebViewConfiguration()
-        config.websiteDataStore = .default()
+        config.websiteDataStore = AppSession.websiteDataStore
         config.mediaTypesRequiringUserActionForPlayback = .all
         webView = WKWebView(frame: .zero, configuration: config)
         super.init()
