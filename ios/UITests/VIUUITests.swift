@@ -21,6 +21,7 @@ final class VIUUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Clear progress"].waitForExistence(timeout: 3))
         app.buttons["Cancel"].tap()
         XCUIDevice.shared.orientation = .landscapeLeft
+        XCTAssertGreaterThan(app.frame.width, app.frame.height)
         capture(app, "Account landscape")
         XCUIDevice.shared.orientation = .portrait
     }
@@ -57,7 +58,7 @@ final class VIUUITests: XCTestCase {
 
     @MainActor
     private func capture(_ app: XCUIApplication, _ name: String) {
-        let attachment = XCTAttachment(screenshot: app.screenshot())
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
